@@ -1,0 +1,466 @@
+import os
+import openai
+import platform
+import subprocess
+import distro
+import requests
+import threading
+import time
+import subprocess
+
+# Set your OpenAI API key here
+openai.api_key = ""
+
+history_file = "conversation_history.txt"
+sample_conversations_file = "sample_conversations.txt"
+guidelines_file = "guidelines.txt"
+
+def load_text_file(file_name):
+    try:
+        if os.path.exists(file_name):
+            with open(file_name, 'r') as f:
+                content = f.read()
+            print(f"{file_name} loaded successfully.")
+        else:
+            content = ""
+            with open(file_name, 'w') as f:
+                f.write(content)
+            print(f"{file_name} not found. A new file has been created.")
+    except IOError as e:
+        print(f"Error loading {file_name}: {e}")
+        content = ""
+    return content
+
+def generate_response(prompt, history):
+    model_engine = "text-davinci-002"
+    
+    sample_conversations = load_text_file(sample_conversations_file)
+    guidelines = load_text_file(guidelines_file)
+    
+    prompt_with_history = f"{guidelines}{sample_conversations}{history}You: {prompt}\nMom: "
+    
+    completions = openai.Completion.create(
+        engine=model_engine,
+        prompt=prompt_with_history,
+        max_tokens=150,
+        n=1,
+        stop=None,
+        temperature=0.8,
+    )
+
+    message = completions.choices[0].text.strip()
+    return message
+
+# Disaster recovery options, scan options, and other functions should be defined here.
+# (Please copy and paste your original functions for these features here.)
+def disaster_recovery_option():
+    print("Ohhh noo! Mommy is so sorry to hear that! I will help you as much as I can!")
+    print("1. Automated Recovery Steps")
+    print("2. Disaster Recovery Plan Template")
+    print("3. Business Impact Analysis (BIA) Tool")
+    print("4. Risk Assessment Tool")
+    print("5. Third-Party Support and Resources")
+    print("6. Checklist for Regulatory Compliance")
+    print("7. Post-Incident Review and Reporting")
+
+    while True:
+        choice = input("Please enter the number corresponding to your choice: ")
+        if choice in ["1", "2", "3", "4", "5", "6", "7"]:
+            return int(choice)
+        else:
+            print("Invalid choice. Please enter a number between 1 and 7.")
+
+TOOLS = [
+    ("ClamAV", "clamav", "A super cute antivirus friend that helps catch bad viruses, trojans, and other icky things."),
+    ("Bleachbit", "bleachbit", "A powerful helper that cleans up your computer, making more space and keeping your secrets safe."),
+    ("KeePassXC", "keepassxc", "A cozy little password manager to keep all your passwords safe and sound."),
+    ("VeraCrypt", "veracrypt", "A secret-keeper that locks up your important data in encrypted treasure chests."),
+    ("Wireshark", "wireshark", "A curious detective that watches and learns from your network traffic."),
+    ("tcpdump", "tcpdump", "A sneaky sniffer that listens in on your network traffic for troubleshooting and analyzing."),
+    ("Nmap", "nmap", "A friendly explorer that finds new friends, services, and hidey-holes on networks."),
+    ("OSQuery", "osquery", "A magical translator that turns computer secrets into easy-to-understand tables."),
+    ("UFW", "ufw", "A gentle but firm firewall friend that keeps your computer safe from unwanted visitors."),
+    ("TestDisk", "testdisk", "A powerful rescuer that helps find lost partitions and fixes broken filesystems."),
+    ("PhotoRec", "photorec", "A helpful helper that finds your lost pictures and other files."),
+    ("Lynis", "lynis", "A watchful guardian that checks your computer's security and finds sneaky vulnerabilities."),
+    ("YARA", "yara", "A clever pattern-matcher that helps sort and identify malware samples."),
+    ("Autopsy", "autopsy", "A digital detective that digs through disk images to uncover important evidence."),
+    ("Sleuth Kit", "sleuthkit", "A toolbox full of helpers for analyzing filesystems and finding deleted files."),
+    ("Snort", "snort", "A sniffy snorter that alerts you to bad network traffic."),
+    ("Suricata", "suricata", "A watchful protector that guards against network threats."),
+    ("Bro/Zeek", "bro", "A big brother that keeps an eye on your network traffic for security and performance."),
+    ("OSSEC", "ossec", "A careful watcher that looks for changes in files and logs."),
+    ("Fail2ban", "fail2ban", "A tough bouncer that blocks bad IPs to protect your computer."),
+    ("AIDE", "aide", "A loyal guard dog that watches your important files and barks if anything changes."),
+    ("TShark", "tshark", "A fin-tastic command-line buddy for watching and learning from network traffic."),
+    ("SSLyze", "sslyze", "A shiny analyzer that checks the safety of your SSL/TLS connections."),
+    ("Cuckoo Sandbox", "cuckoo", "A safe playpen where you can watch suspicious files without getting hurt."),
+]
+
+DADDYS_TOOLS = [
+    ("Metasploit", "metasploit-framework", "A super cool toolbox for creating and using sneaky exploits."),
+    ("Nmap", "nmap", "A playful explorer that maps out networks and their hidden treasures."),
+    ("Burp Suite", "burpsuite", "A bubbly buddy for testing the safety of web applications."),
+    ("Wireshark", "wireshark", "A curious detective that watches and learns from your network traffic."),
+    ("Aircrack-ng", "aircrack-ng", "A set of tools to play detective with wireless networks and crack their secret codes."),
+    ("John the Ripper", "john", "A fast code-breaker that can crack secret passwords and help test their strength."),
+    ("Hydra", "hydra", "A many-headed friend that helps crack online passwords on various protocols."),
+    ("SQLmap", "sqlmap", "A smart mapper that finds secret doors in web applications and explores hidden databases."),
+    ("Nikto", "nikto", "A friendly scanner that checks web servers for weak spots and outdated stuff."),
+    ("Mimikatz", "mimikatz", "A sneaky kitty that can pull passwords, hashes, and tickets out of a computer's memory."),
+    ("Empire", "powershell-empire", "A powerful kingdom of tools for controlling other computers using PowerShell and Python."),
+    ("Cobalt Strike", "cobaltstrike", "A fancy toolkit for hackers that offers lots of cool tricks like phishing and command control."),
+    ("Armitage", "armitage", "A colorful artist that helps you use Metasploit's powerful tools with a pretty interface."),
+    ("Responder", "responder", "A sneaky trickster that plays pretend to capture information on local networks."),
+    ("Hashcat", "hashcat", "A super-fast code-cracking kitty that can break password hashes in no time."),
+    ("Gobuster", "gobuster", "A speedy explorer that searches for hidden directories and files on websites."),
+    ("Gitrob", "gitrob", "A friendly robot that finds sensitive information accidentally shared on GitHub."),
+    ("ZAP", "zap", "A zappy helper for finding security bugs in web applications and zapping them away."),
+]
+
+
+import distro
+import platform
+import subprocess
+
+def install_package(package_name):
+    if platform.system() == "Linux":
+        distribution_id = distro.id().lower()
+        if "debian" in distribution_id or "ubuntu" in distribution_id:
+            subprocess.run(["sudo", "apt", "install", "-y", package_name], check=True)
+        elif "arch" in distribution_id or "manjaro" in distribution_id:
+            subprocess.run(["sudo", "pacman", "-S", "--noconfirm", package_name], check=True)
+        else:
+            print(f"Unsupported Linux distribution. Please install {package_name} manually.")
+            return
+    else:
+        print("This script only supports Linux systems. Please install the packages manually.")
+        return
+    print(f"{package_name} installed successfully!")
+
+def install_package2(package_name):
+    if platform.system() == "Linux":
+        distribution_id = distro.id().lower()
+        if "debian" in distribution_id or "ubuntu" in distribution_id:
+            subprocess.run(["sudo", "apt", "install", "-y", package_name], check=True)
+        elif "arch" in distribution_id or "manjaro" in distribution_id:
+            subprocess.run(["sudo", "pacman", "-S", "--noconfirm", package_name], check=True)
+        else:
+            print(f"Unsupported Linux distribution. Please install {package_name} manually.")
+            return
+    else:
+        print("This script only supports Linux systems. Please install the packages manually.")
+        return
+    print(f"{package_name} installed successfully!")
+
+
+# Option 1: Automated Recovery Steps
+def automated_recovery_steps():
+    print("Ok baby lets start from the begining ok? Remember to relax and breath everything is going to be ok:")
+    steps = [
+        "1. Isolate the affected systems to prevent the spread of the breach. Disconnect them from the network, disable Wi-Fi and Bluetooth connections, and shut down non-essential services.",
+        "2. Inform the relevant stakeholders, including employees, customers, and partners. Notify them about the breach, its potential impact, and the actions being taken to address it.",
+        "3. Gather and preserve evidence of the breach for further analysis. Collect logs, network traffic data, and any other relevant artifacts for forensic investigation.",
+        "4. Identify the root cause of the breach and take steps to address it. Investigate how the breach occurred, whether it was due to a technical vulnerability or human error, and implement measures to fix the issue.",
+        "5. Implement measures to prevent future breaches, such as stronger passwords, multi-factor authentication, and employee training. Update security policies, patch systems, and conduct regular security audits.",
+        "6. Create and maintain a detailed incident response plan. Document the steps to be taken during and after a breach, assign roles and responsibilities, and establish communication channels.",
+        "7. Conduct a thorough review of the incident and implement lessons learned. Analyze the effectiveness of the response, identify areas for improvement, and update the incident response plan accordingly.",
+    ]
+    for step in steps:
+        print(step)
+        input("Just push enter when you are ready to continue little one:")
+
+# Option 2: Disaster Recovery Plan Template
+def disaster_recovery_plan_template():
+    print("Ok Pumpkin here is your template!:")
+    steps = [
+    "1. Introduction: Provide an overview of the disaster recovery plan, its purpose, and scope.",
+    "2. Objectives and Scope: Define the specific goals and boundaries of the plan.",
+    "3. Roles and Responsibilities: Assign tasks and responsibilities to team members during a disaster recovery event.",
+    "4. Incident Response Procedures: Detail the steps to be taken during the initial response to a disaster, such as isolating systems, gathering evidence, and informing stakeholders.",
+    "5. Backup and Recovery Procedures: Describe the methods for backing up and restoring data, applications, and systems, as well as the frequency and storage locations of backups.",
+    "6. Testing and Maintenance: Establish a schedule for testing the plan and updating it as necessary, based on test results, changes in technology, and evolving business needs.",
+    "7. External Contacts and Resources: List contact information for external parties, such as vendors, regulatory agencies, and law enforcement.",
+    "8. Appendices (e.g., emergency contacts, sample forms): Include additional documents and resources that support the disaster recovery plan.",
+    ]
+    for step in steps:
+        print(step)
+        input("Just push enter when you are ready to continue little one:")
+
+# Option 3: Business Impact Analysis (BIA) Tool
+def bia_tool():
+    print("Ok sweetheart here is your Business Impact Analysis tool!:")
+    steps = [
+    "1. Identify critical business functions and processes: List all the essential activities that support the organization's mission and objectives.",
+    "2. Determine the maximum acceptable downtime for each function and process: Estimate the maximum period for which each activity can be disrupted before causing severe harm to the organization.",
+    "3. Assess the financial and operational impact of disruptions: Calculate the potential losses and negative consequences that could result from a disruption of each critical function or process.",
+    "4. Identify dependencies between functions and processes: Analyze the relationships between different activities to understand how a disruption in one area could impact others.",
+    "5. Develop recovery priorities based on the analysis: Prioritize the recovery of critical functions and processes based on their maximum acceptable downtime and the potential impact of disruptions.",
+    ]
+    for step in steps:
+        print(step)
+        input("Just push enter when you are ready to continue little one:")
+
+# Option 4: Risk Assessment Tool
+def risk_assessment_tool():
+    print("Ok my little baby! Here is your Risk Assessment Tool:")
+    steps = [
+    "1. Identify potential threats and vulnerabilities: List all possible risks, such as natural disasters, cyber attacks, and human error, that could impact your organization's critical functions and processes.",
+    "2. Estimate the likelihood and impact of each threat: Assess the probability of each risk occurring and the potential consequences for your organization.",
+    "3. Prioritize risks based on likelihood and impact: Rank the risks in order of their significance to the organization, taking into account both their probability and potential consequences.",
+    "4. Develop risk mitigation strategies: Identify measures to reduce the likelihood and impact of each risk, such as implementing security controls, establishing backup and recovery procedures, and training employees.",
+    "5. Monitor and review risks periodically: Regularly evaluate the organization's risk profile and update the risk assessment as needed to reflect changes in the threat landscape and the organization's operations.",
+    ]
+    for step in steps:
+        print(step)
+        input("Just push enter when you are ready to continue little one:")
+
+# Option 5: Third-Party Support and Resources
+def third_party_support_and_resources():
+    print("You're such a good baby everything is going to be ok! Here are some resources to help you, ok honey?:")
+    steps = [
+    "1. Data breach response service providers: Companies specializing in assisting organizations with data breach response, such as forensic investigation and incident management.",
+    "2. Cybersecurity consultants: Experts who can help evaluate and improve an organization's security posture, including vulnerability assessments and penetration testing.",
+    "3. Legal counsel specializing in data breaches: Lawyers who can provide guidance on legal and regulatory requirements related to data breaches and help navigate potential legal issues.",
+    "4. Public relations firms: Professionals who can assist with managing the organization's reputation and communicating with the public following a data breach.",
+    "5. Insurance providers offering cyber insurance: Companies that provide coverage for losses resulting from data breaches and other cyber incidents.",
+    ]
+    for step in steps:
+        print(step)
+        input("Just push enter when you are ready to continue little one:")
+
+# Option 6: Checklist for Regulatory Compliance
+def regulatory_compliance_checklist():
+    print("Take out your pencil little one! Heres your checklist for Regulatory Compliance...You're such a sweet baby!:")
+    steps = [
+    "1. Review data protection regulations relevant to your industry: Familiarize yourself with the legal and regulatory requirements governing data protection in your jurisdiction and sector.",
+    "2. Develop a data breach notification plan: Establish procedures for informing affected individuals, regulators, and other relevant parties in the event of a data breach, in compliance with applicable laws.",
+    "3. Train employees on regulatory requirements: Ensure that staff members understand their responsibilities under data protection laws and are equipped to comply with them.",
+    "4. Ensure data breach response plan complies with regulations: Review and update the organization's incident response plan to ensure that it aligns with legal and regulatory requirements.",
+    "5. Consult legal counsel for guidance on regulatory compliance: Engage a lawyer specializing in data protection to advise on compliance issues and help the organization navigate potential legal challenges.",
+    ]
+    for step in steps:
+        print(step)
+        input("Just push enter when you are ready to continue little one:")
+
+# Option 7: Post-Incident Review and Reporting
+def post_incident_review_and_reporting():
+    print("Good job baby, here's your Post-Incident Review and Reporting make sure to let your boss know how much of a big girl or boy you are!:")
+    steps = [
+    "1. Analyze the data breach and its root cause: Conduct a thorough investigation of the incident, including the factors that contributed to the breach and the effectiveness of the response.",
+    "2. Document the incident response process: Create a detailed record of the actions taken during and after the breach, including decisions made, resources used, and the outcomes achieved.",
+    "3. Identify areas for improvement in the response plan: Analyze the incident response process to identify strengths and weaknesses, and develop recommendations for enhancing the plan.",
+    "4. Implement changes to the response plan based on lessons learned: Update the incident response plan to incorporate the findings from the review, and ensure that it remains effective and relevant.",
+    "5. Share findings with relevant stakeholders: Communicate the results of the post-incident review to management, employees, and other stakeholders, as appropriate, to promote learning and continuous improvement.",
+    ]
+    for step in steps:
+        print(step)
+        input("Just push enter when you are ready to continue little one:")
+
+
+def display_options():
+    print("\nPlease choose an option:")
+    print("1. Talk to Mommy")
+    print("2. Emergency Playtime")
+    print("3. Mommy's First Aid Kit")
+    print("4. Daddys Toolbox")
+    print("5. Search the web")
+    print("6. Mommy please hold my hand to scan a network with nmap!")
+    print("7. Mommy can I sit on your lap while we use TShark?")
+    print("8. Map Adventure")
+    print("7. Signal Adventures")
+    print("8. Puzzle Solving")
+    print("9. Mystery Solver")
+    print("10. Emergency Playtime")
+    print("Type 'bye' to exit.\n")
+
+def handle_sub_options(option):
+    # Add your sub-options and their corresponding functions here, based on the user_input
+    print(f"Sub-options for option {option}:")
+    print("Sub-option 1")
+    print("Sub-option 2")
+    print("...")
+
+from googleapiclient.discovery import build
+
+def search_google(query, api_key, search_engine_id, start_index=1, count=10):
+    service = build("customsearch", "v1", developerKey=api_key)
+    results = service.cse().list(q=query, cx=search_engine_id, start=start_index, num=count).execute()
+    return results
+
+
+def display_search_results(query, api_key, search_engine_id, result_count=20):
+    current_start_index = 1
+    while current_start_index <= result_count:
+        search_results = search_google(query, api_key, search_engine_id, start_index=current_start_index)
+        for result in search_results.get("items", []):
+            print(result["title"])
+            print(result["link"])
+            print(result["snippet"])
+            print()
+        current_start_index += 10
+
+
+api_key = "PUT API KEY FOR GOOGLE HERE"
+search_engine_id = "PUT SEARCH ENGINE ID HERE"
+
+
+
+def nmap_tool():
+    while True:
+        nmap_command = input("Enter your nmap command or 'mommy:' followed by your question: ")
+        if nmap_command.lower().startswith("mommy:"):
+            question = nmap_command[6:].strip()
+            response = generate_response(question, "")  # Replace with the actual function for generating a response
+            print(f"Mommy says: {response}")
+        else:
+            try:
+                result = subprocess.run(nmap_command.split(), capture_output=True, text=True)
+                print(result.stdout)
+            except Exception as e:
+                print(f"An error occurred while executing the nmap command: {e}")
+
+
+
+def ask_mommy():
+    while True:
+        user_input = input()
+        if user_input.lower().startswith("mommy:"):
+            question = user_input[4:].strip()
+            response = generate_response(question, "")  # Replace with the actual function for generating a response
+            print(f"Mommy says: {response}")
+        else:
+            print("Invalid command. Please use 'mommy:' followed by your question to ask Mommy.")
+
+
+
+def tshark_tool():
+    while True:
+        tshark_command = input("Enter your TShark command or 'mommy:' followed by your question to ask Mommy: ")
+        if tshark_command.lower().startswith("mommy:"):
+            question = tshark_command[6:].strip()
+            response = generate_response(question, "")  # Replace with the actual function for generating a response
+            print(f"Mommy says: {response}")
+        else:
+            try:
+                result = subprocess.run(tshark_command.split(), capture_output=True, text=True)
+                print(result.stdout)
+            except Exception as e:
+                print(f"An error occurred while executing the TShark command: {e}")
+
+
+
+
+
+
+
+
+
+
+def main():
+    print("Hello, little one! I'm here to help you. If you want to stop talking, just type 'bye'.\n")
+    history = load_text_file(history_file)
+
+    while True:
+        display_options()
+        user_input = input("You: ")
+
+        if user_input.lower() == "bye":
+            print("Goodbye, sweetie! Take care.")
+            break
+
+        if user_input == "1":
+            print("Mom: Hi little one! What did you want to talk to Mommy about?")
+            while True:
+                user_input = input("You: ")
+                if user_input.lower() == "bye" or user_input.lower() == "back":
+                    break
+                response = generate_response(user_input, history)
+                print("Mom: {}".format(response))
+                history += f"You: {user_input}\nMom: {response}\n"
+        
+
+            with open(history_file, 'w') as f:
+                f.write(history)
+
+        elif user_input == "2":
+            print("Oh no! Has my poor baby been breached?! Here are some disaster recovery options!")
+            dr_choice = disaster_recovery_option()
+
+            if dr_choice == 1:
+                automated_recovery_steps()
+            elif dr_choice == 2:
+                disaster_recovery_plan_template()
+            elif dr_choice == 3:
+                bia_tool()
+            elif dr_choice == 4:
+                risk_assessment_tool()
+            elif dr_choice == 5:
+                third_party_support_and_resources()
+            elif dr_choice == 6:
+                regulatory_compliance_checklist()
+            elif dr_choice == 7:
+                post_incident_review_and_reporting()
+
+        elif user_input == "3":
+            print (" Awww does baby have a boo boo? Here are some first aid options!")
+            for idx, (tool_name, _, description) in enumerate(TOOLS):
+                print(f"{idx + 1}. {tool_name}: {description}")
+
+            selected_tool = int(input("\nPlease enter the number of the tool you'd like to install little one: ")) - 1
+            tool_name, package_name, _ = TOOLS[selected_tool]
+
+            print(f"\nInstalling {tool_name}...")
+            install_package(package_name)
+        
+        
+        elif user_input == "4":
+            print ("Ohhhh you're such a naughty Little! Here are some Daddy's tools!")
+            #write script to get this option working like 3 but for DADDYS_TOOLS
+            for idx, (tool_name, _, description) in enumerate(DADDYS_TOOLS):
+                print(f"{idx + 1}. {tool_name}: {description}")
+
+            selected_tool = int(input("\nPlease enter the number of the tool you'd like to install little one: ")) - 1
+            tool_name, package_name, _ = DADDYS_TOOLS[selected_tool]
+
+            print(f"\nInstalling {tool_name}...")
+            install_package(package_name)
+
+        elif user_input == "5":
+            print("Awww baby wants to search google? Mommy is here to help!")
+            query = input("What would you like to search for little one? ")
+            display_search_results(query, api_key, search_engine_id)
+
+        elif user_input == "6":
+            print("Of course honey! Mommy will hold your hand while you scan a network! Lets do it together! Just type 'mommy:' followed by your question to ask Mommy.")
+            nmap_thread = threading.Thread(target=nmap_tool)
+            ask_mommy_thread = threading.Thread(target=ask_mommy)
+
+            nmap_thread.start()
+            ask_mommy_thread.start()
+
+            nmap_thread.join()
+            ask_mommy_thread.join()
+
+        elif user_input == "7":  # or the next available number in your menu
+            print("Of course, sweetheart! Mommy will help you analyze network traffic with TShark.")
+            tshark_thread = threading.Thread(target=tshark_tool)
+            ask_mommy_thread = threading.Thread(target=ask_mommy)
+
+            tshark_thread.start()
+            ask_mommy_thread.start()
+
+            tshark_thread.join()
+            ask_mommy_thread.join()
+
+
+                
+
+
+
+
+            
+
+
+if __name__ == "__main__":
+    main()
