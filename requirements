@@ -1,0 +1,6 @@
+beautifulsoup4==4.10.0
+feedparser==6.0.8
+nltk==3.6.5
+requests==2.26.0
+colorama==0.4.4
+pyfiglet==0.8.post1
